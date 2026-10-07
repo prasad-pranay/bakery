@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+:root {
+  /* --background: #F3EAE6; */
+  --background: #f3ebe4;
+  --border: #e2e2e2;
+  --foreground: #341715;
+}
+
+.font-title {
+  font-family: var(--font-title);
+}
+
+.font-sub-title {
+  font-family: var(--font-sub-title);
+}
+
+.font-header {
+  font-family: var(--font-header);
+}
+
+.font-text {
+  font-family: var(--font-text);
+}
+
+body {
+  /* background: var(--background); */
+  /* background: linear-gradient(to bottom, var(--background), white); */
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.sidebar-none::-webkit-scrollbar {
+  display: none;
+}
+
+
+
+@keyframes spiral-rotate {
+  0% {
+    rotate: 0deg;
+  }
+
+  50% {
+    rotate: 360deg;
+  }
+
+  100% {
+    rotate: 0deg;
+  }
+}
+
+@keyframes breathe {
+  0% {
+    scale: 1;
+  }
+
+  50% {
+    scale: 1.05;
+  }
+
+  100% {
+    scale: 1;
+  }
+}
+
+
+.product-marquee {
+  animation: product-marquee 25s linear infinite;
+}
+
+@keyframes product-marquee {
+  from {
+    transform: translateX(-50%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes story-image-enter {
+  from {
+    opacity: 0.65;
+    transform: scale(1.035);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes story-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.story-image-enter {
+  animation: story-image-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.story-content-enter {
+  animation: story-content-enter 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .story-image-enter,
+  .story-content-enter {
+    animation: none;
+  }
+}
+
+
+
+
+
+/* Shared track styling */
+.marquee-track {
+  will-change: transform;
+  animation-duration: var(--marquee-duration, 32s);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: none;
+}
+
+/* Both rows continuously move to the left. */
+.marquee-first {
+  animation-name: marquee-left;
+}
+
+.marquee-second {
+  animation-name: marquee-left;
+}
+
+/* The second row starts at a different horizontal position. */
+.marquee-second {
+  animation-delay: -8s;
+}
+
+@keyframes marquee-left {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
