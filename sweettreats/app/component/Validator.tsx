@@ -138,17 +138,17 @@ export function Validator({children,}: {children: ReactNode;}) {
                 console.log(error)
             }
         }
-        const [splash,setSplash] = useState(false)
+        const [splash,setSplash] = useState(true)
         useEffect(() => {
             setTimeout(() => {
                 setSplash(false)
-            }, 2500);
+            }, 2000);
             checkUser(); 
             fetchProducts(); 
         }, []);
   return (
     <>
-    <SplashPage exiting={!splash} />
+    <SplashPage show={splash} />
     {!splash && <>
         {!admin && <Header/>}
         {children}

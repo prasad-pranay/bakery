@@ -23,6 +23,7 @@ import {
 } from "framer-motion";
 
 import {Product,Category} from "../type/product";
+import { useAuthStore } from "../store/authStore";
 
 export default function QuickView({
     product,
@@ -33,6 +34,8 @@ export default function QuickView({
     onClose: () => void;
     onAdd: () => void;
 }) {
+    const {setProducts} = useAuthStore()
+
     const [activeSection, setActiveSection] = useState<
         "details" | "reviews" | "ingredients"
     >("details");
@@ -46,15 +49,33 @@ export default function QuickView({
 
     const reviews = product.reviews ?? [];
 
-    const handleSubmitReview = () => {
+    const handleSubmitReview = async () => {
         if (!userRating || !review.trim()) return;
 
-        // Connect this to your backend later.
-        console.log({
-            productId: product._id,
-            rating: userRating,
-            review: review.trim(),
-        });
+         try {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products/${product._id}/reviews`,{
+                    method:"POST",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body:JSON.stringify({
+                        rating: userRating,
+                        text: review,
+                    })
+                });
+                const data = await response.json();
+                setProducts(data.data);
+            } catch (error) {
+                console.log(error)
+            }
+
+        // // Connect this to your backend later.
+        // console.log({
+        //     productId: product._id,
+        //     rating: userRating,
+        //     review: review.trim(),
+        // });
 
         setReview("");
         setUserRating(0);
@@ -859,7 +880,7 @@ export default function QuickView({
                                         {reviews.length > 0 && (
                                             <div className="mt-5">
                                                 <div className="mb-3 flex items-center justify-between">
-                                                    <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#321714]/45">
+                                                    <span className="text-[9px] font-text font-bold uppercase tracking-[0.12em] text-[#321714]/45">
                                                         From the bakery crowd
                                                     </span>
 
@@ -870,8 +891,9 @@ export default function QuickView({
 
                                                 <div className="space-y-3">
                                                     {reviews.map(
-                                                        (item, index) => (
-                                                            <motion.div
+                                                        (item, index) => {
+                                                            const itemDate = new Date(item.date)
+                                                            return (<motion.div
                                                                 key={item.id}
                                                                 initial={{
                                                                     opacity: 0,
@@ -889,7 +911,7 @@ export default function QuickView({
                                                                 className="
                                                                     rounded-[14px]
                                                                     bg-white/50
-                                                                    p-4
+                                                                    p-4 font-text
                                                                 "
                                                             >
                                                                 <div className="flex items-start justify-between gap-3">
@@ -924,7 +946,7 @@ export default function QuickView({
                                                                                                 ? "#FFD91A"
                                                                                                 : "transparent"
                                                                                         }
-                                                                                        className="text-[#321714]"
+                                                                                        className="text-[#FFD91A]"
                                                                                     />
                                                                                 )
                                                                             )}
@@ -932,9 +954,7 @@ export default function QuickView({
                                                                     </div>
 
                                                                     <span className="text-[8px] font-medium text-[#321714]/25">
-                                                                        {
-                                                                            item.date
-                                                                        }
+                                                                        {itemDate.toLocaleDateString("en-IN")}
                                                                     </span>
                                                                 </div>
 
@@ -944,7 +964,7 @@ export default function QuickView({
                                                                     }
                                                                 </p>
                                                             </motion.div>
-                                                        )
+                                                        )}
                                                     )}
                                                 </div>
                                             </div>

@@ -115,14 +115,14 @@ export const addReview = async (req: any, res: Response) => {
     if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
     // Check if user already reviewed (optional but requested)
-    const alreadyReviewed = product.reviews.find(r => r.userId?.toString() === req.user._id.toString());
-    if (alreadyReviewed) return res.status(400).json({ success: false, message: 'You already reviewed this product' });
+    // const alreadyReviewed = product.reviews.find(r => r.userId?.toString() === req.user._id.toString());
+    // if (alreadyReviewed) return res.status(400).json({ success: false, message: 'You already reviewed this product' });
 
     const review = {
       id: Date.now(),
       name: req.user.name,
       rating: Number(rating),
-      text,
+      text: text,
       date: new Date().toISOString(),
       userId: req.user._id
     };
@@ -132,7 +132,8 @@ export const addReview = async (req: any, res: Response) => {
     product.rating = product.reviews.reduce((acc, item) => item.rating + acc, 0) / product.reviews.length;
 
     await product.save();
-    res.status(201).json({ success: true, data: product });
+    const allProducts = await Product.find({});
+    res.status(201).json({ success: true, data: allProducts });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

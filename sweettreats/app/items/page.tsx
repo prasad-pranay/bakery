@@ -33,6 +33,7 @@ import { cartItemType, cartAddBackend, cartUpdateBackend, cartItemRemove } from 
 
 
 
+
 const categories: {
     name: Category;
     icon: React.JSX.Element;
