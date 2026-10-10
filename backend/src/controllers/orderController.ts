@@ -4,6 +4,7 @@ import User from '../models/User';
 import Product from '../models/Product';
 import Order from '../models/Order';
 import { sendEmail } from '../utils/email';
+import Coupon from '../models/Coupon';
 
 
 
@@ -15,7 +16,7 @@ export const createOrder = async (req: any, res: Response) => {
       throw new Error("Cart is empty or user not found");
     }
 
-    const { shippingAddress, paymentMethod } = req.body;
+    const { shippingAddress, paymentMethod, coupon } = req.body;
 
     let subtotal = 0;
     const orderItems = [];
@@ -48,8 +49,23 @@ export const createOrder = async (req: any, res: Response) => {
     }
 
     // Handle discounts/coupons here...
-    const discount = 0;
-    const deliveryFee = 5;
+    const couponFind = await Coupon.findOne({ couponCode: coupon.code })
+    let discount = 0;
+    if (couponFind) {
+      if (couponFind.discountType === "PERCENTAGE") {
+        const disTemp = subtotal * (couponFind.discountValue / 100);
+        if (disTemp > (couponFind.maximumDiscount || 0)) {
+          discount = (couponFind.maximumDiscount || 0);
+        } else {
+          discount = disTemp;
+        }
+      } else {
+        discount = couponFind.discountValue;
+      }
+      await user.usedCoupons.push(couponFind?._id)
+      await user.save()
+    }
+    const deliveryFee = subtotal > 500 ? 0 : 30;
     const total = subtotal - discount + deliveryFee;
 
     const orderId =

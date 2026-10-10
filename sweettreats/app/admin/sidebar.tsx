@@ -9,10 +9,12 @@ import {
   Menu,
   X,
   ChevronDown,
+  BadgePercent,
+  MessageCircleQuestionMark,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-type SidebarTab = "dashboard" | "items" | "orders" | "support";
+type SidebarTab = "dashboard" | "items" | "orders" | "support" | "coupons";
 
 type AdminHeaderProps = {
   activeTab: SidebarTab;
@@ -43,6 +45,12 @@ export default function AdminHeader({
       href: "/admin/items",
     },
     {
+      id: "coupons" as const,
+      label: "Coupons",
+      icon: BadgePercent,
+      href: "/admin/coupon",
+    },
+    {
       id: "orders" as const,
       label: "Orders",
       icon: ShoppingBag,
@@ -51,7 +59,7 @@ export default function AdminHeader({
     {
       id: "support" as const,
       label: "Support",
-      icon: ShoppingBag,
+      icon: MessageCircleQuestionMark,
       href: "/admin/contact",
     },
   ];

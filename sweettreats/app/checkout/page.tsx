@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -30,20 +30,14 @@ import {
 } from "lucide-react";
 
 import { SavedAddress, SavedPaymentMethod, useAuthStore } from "../store/authStore";
-import {  useRouter } from "next/navigation";
-import {User} from "../store/authStore"
+import { useRouter } from "next/navigation";
+import { User } from "../store/authStore"
+import { cartItemRemove } from "../type/cart";
 
-type Coupon = {
-  code: string;
-  label: string;
-  discount: number;
-  type: "percentage" | "fixed";
-};
-
-const COUPONS: Coupon[] = [
-  { code: "FIRSTBAKE", label: "10% OFF", discount: 10, type: "percentage" },
-  { code: "SWEET20", label: "₹20 OFF", discount: 20, type: "fixed" },
-];
+// const COUPONS: Coupon[] = [
+//   { code: "FIRSTBAKE", label: "10% OFF", discount: 10, type: "percentage" },
+//   { code: "SWEET20", label: "₹20 OFF", discount: 20, type: "fixed" },
+// ];
 
 const SUGGESTED_STORE = {
   name: "SweetTreats · Central Store",
@@ -65,11 +59,11 @@ const STEP_DATA: Array<{
   label: string;
   short: string;
 }> = [
-  { number: 1, label: "Your order", short: "ORDER" },
-  { number: 2, label: "Coupon & contact", short: "SWEET DEALS" },
-  { number: 3, label: "Delivery", short: "DELIVERY" },
-  { number: 4, label: "Payment", short: "PAYMENT" },
-];
+    { number: 1, label: "Your order", short: "ORDER" },
+    { number: 2, label: "Coupon & contact", short: "SWEET DEALS" },
+    { number: 3, label: "Delivery", short: "DELIVERY" },
+    { number: 4, label: "Payment", short: "PAYMENT" },
+  ];
 
 const stepCopy: Record<CheckoutStep, { eyebrow: string; title: string; description: string }> = {
   1: {
@@ -94,6 +88,19 @@ const stepCopy: Record<CheckoutStep, { eyebrow: string; title: string; descripti
   },
 };
 
+
+type CouponType = {
+  code: string,
+  discountType: "PERCENTAGE" | "FIXED",
+  discountValue: number,
+  minimumOrderValue: number,
+  maximumDiscount: number,
+  expiresAt: Date,
+  usageLimit: number,
+  usedCount: number,
+  isActive: boolean,
+}
+
 export default function CheckoutPage() {
   const { cart, products, setCartItem, user, setUser } = useAuthStore();
 
@@ -103,17 +110,38 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState("");
   const [selectedAddress, setSelectedAddress] = useState<SavedAddress | null>(null);
   const [couponInput, setCouponInput] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponType | null>(null);
   const [couponError, setCouponError] = useState("");
   const [placingOrder, setPlacingOrder] = useState(false);
 
+  const [COUPONS, setCoupon] = useState<CouponType[]>([]);
+
+  useEffect(() => {
+    async function getCoupon() {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coupons`);
+      const data = await response.json();
+      setCoupon(data.data);
+      console.log("coupon data,", data.data)
+    }
+    getCoupon();
+  }, []);
+
+  useEffect(() => {
+    if (user?.savedAddresses.length != undefined && user.savedAddresses.length > 0) {
+      setPhone(user?.savedAddresses[0].phone)
+      console.log("phone number added")
+    } else {
+      console.log("NO PHONE")
+
+    }
+  }, [user])
 
   const cartProducts = useMemo(
     () =>
       cart
         .map((item) => {
           const product = products.find((p) => String(p._id) === String(item.productId));
-          return product ? { product, quantity: item.quantity } : null;
+          return product ? { _id: product._id, product: product, quantity: item.quantity } : null;
         })
         .filter((item): item is NonNullable<typeof item> => item !== null),
     [cart, products]
@@ -128,24 +156,70 @@ export default function CheckoutPage() {
 
   const discount = useMemo(() => {
     if (!appliedCoupon) return 0;
-    if (appliedCoupon.type === "fixed") return Math.min(appliedCoupon.discount, subtotal);
-    return Math.round(subtotal * (appliedCoupon.discount / 100));
+    if (appliedCoupon.discountType === "FIXED") {
+      if (appliedCoupon.minimumOrderValue > subtotal) {
+        setCouponError(`Minimum order value should be ${appliedCoupon.minimumOrderValue}`)
+      }
+      return Math.min(appliedCoupon.discountValue, subtotal);
+      return 0;
+    } else {
+      if (appliedCoupon.minimumOrderValue > subtotal) {
+        setCouponError(`Minimum order value should be ${appliedCoupon.minimumOrderValue}`)
+        return 0;
+      }
+      const disValue = Math.round(subtotal * (appliedCoupon.discountValue / 100));
+      if (disValue > appliedCoupon.maximumDiscount) {
+        return appliedCoupon.maximumDiscount;
+      } else {
+        return disValue;
+      }
+    }
   }, [appliedCoupon, subtotal]);
 
   const total = Math.max(0, subtotal + deliveryFee - discount);
 
-  function updateQuantity(productId: string, quantity: number) {
-    const nextCart = cart
-      .map((item) =>
-        String(item.productId) === String(productId) ? { ...item, quantity } : item
-      )
-      .filter((item) => item.quantity > 0);
 
-    setCartItem(nextCart);
+  async function cartUpdateBackend(id: number, newQuantity: number) {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/cart/${id}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        quantity: newQuantity,
+      }),
+    });
+    const data = await response.json();
+    return data;
+  }
+  async function updateBag(id: number, quantity: number) {
+    try {
+      const response =
+        quantity === 0
+          ? await cartItemRemove(id)
+          : await cartUpdateBackend(id, quantity);
+
+      if (!response.success) {
+        console.log(response.message || "Failed to update value");
+        return;
+      }
+      console.log("cart data reicieved ", response.data)
+
+      setCartItem(response.data);
+
+    } catch (error) {
+      console.error("Failed to update bag:", error);
+    }
   }
 
-  function removeItem(productId: string) {
-    setCartItem(cart.filter((item) => String(item.productId) !== String(productId)));
+  function updateQuantity(productId: number, quantity: number) {
+    console.log(productId, quantity)
+    updateBag(productId, quantity)
+  }
+
+  function removeItem(productId: number) {
+    cartItemRemove(productId)
   }
 
   function applyCoupon() {
@@ -162,12 +236,21 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (coupon.minimumOrderValue > subtotal) {
+      setCouponError(`Minimum Order value for ${coupon.code} is ${money(coupon.minimumOrderValue)}`)
+      return;
+    }
+
     setAppliedCoupon(coupon);
     setCouponInput(coupon.code);
     setCouponError("");
   }
 
-  function applySuggestedCoupon(coupon: Coupon) {
+  function applySuggestedCoupon(coupon: CouponType) {
+    if (coupon.minimumOrderValue > subtotal) {
+      setCouponError(`Minimum Order value for ${coupon.code} is ${money(coupon.minimumOrderValue)}`)
+      return;
+    }
     setAppliedCoupon(coupon);
     setCouponInput(coupon.code);
     setCouponError("");
@@ -206,7 +289,7 @@ export default function CheckoutPage() {
 
     void onPlaceOrder();
   }
-   const router = useRouter();
+  const router = useRouter();
 
   async function onPlaceOrder() {
     if (placingOrder) return;
@@ -230,7 +313,8 @@ export default function CheckoutPage() {
             state: "",
             pincode: selectedAddress?.postalCode || "delhi",
           },
-          paymentMethod,
+          paymentMethod: paymentMethod,
+          coupon: appliedCoupon ? appliedCoupon.code : "",
         }),
       });
 
@@ -259,7 +343,7 @@ export default function CheckoutPage() {
     window.history.back();
   }
 
- 
+
 
   const [addressForm, setAddressForm] = useState({
     label: "Home",
@@ -270,48 +354,48 @@ export default function CheckoutPage() {
     phone: "",
   });
   const [addressModal, setAddressModal] = useState<{
-      open: boolean;
-      address?: SavedAddress;
-    }>({
-      open: false,
-    });
+    open: boolean;
+    address?: SavedAddress;
+  }>({
+    open: false,
+  });
 
   const saveAddress = async () => {
     if (!addressForm.address || !addressForm.city) return;
 
-    try{
-      const response  = fetch(process.env.NEXT_PUBLIC_API_URL+"/api/users/me/addresses",{
-        method:"POST",
+    try {
+      const response = fetch(process.env.NEXT_PUBLIC_API_URL + "/api/users/me/addresses", {
+        method: "POST",
         credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  label: addressForm.label,
-                  name:  addressForm.name,
-    phone:  addressForm.phone,
-    addressLine1:  addressForm.address,
-    city:  addressForm.city,
-    state: addressForm.city,
-    postalCode: addressForm.pincode,
-    country: "India",
-                })
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          label: addressForm.label,
+          name: addressForm.name,
+          phone: addressForm.phone,
+          addressLine1: addressForm.address,
+          city: addressForm.city,
+          state: addressForm.city,
+          postalCode: addressForm.pincode,
+          country: "India",
+        })
       })
       const data = await (await response).json()
 
-      if(data.success){
+      if (data.success) {
         setUser({
-                    id: data.data["_id"],
-                    email: data.data["email"],
-                    name: data.data["name"],
-                    savedAddresses: data.data["savedAddresses"],
-                    payment: data.data["savedPaymentMethods"]
-                })
-      }else{
+          id: data.data["_id"],
+          email: data.data["email"],
+          name: data.data["name"],
+          savedAddresses: data.data["savedAddresses"],
+          payment: data.data["savedPaymentMethods"]
+        })
+      } else {
         alert("error")
-        console.log("error occured",data.message)
+        console.log("error occured", data.message)
       }
-    }catch(error){
+    } catch (error) {
       console.log(error)
     }
     setAddressModal({
@@ -334,46 +418,46 @@ export default function CheckoutPage() {
     });
   };
 
-  
 
-  const [selectedPayment,setSelectedPayment] = useState<SavedPaymentMethod|null>(null)
-   const [paymentModal, setPaymentModal] = useState(false);
-    const savePayment = async () => {
+
+  const [selectedPayment, setSelectedPayment] = useState<SavedPaymentMethod | null>(null)
+  const [paymentModal, setPaymentModal] = useState(false);
+  const savePayment = async () => {
     if (!paymentForm.details) return;
 
-     try{
+    try {
       const paymentMethod = {
-  provider: paymentForm.type,
-  type: "card",
-  brand: paymentForm.type,
-  last4: paymentForm.details,
-  expiryMonth: Number(paymentForm.expiry.split("/")[0]),
-  expiryYear: Number(`20${paymentForm.expiry.split("/")[1]}`),
-  isDefault: true,
-};
-      const response  = fetch(process.env.NEXT_PUBLIC_API_URL+"/api/users/me/payments",{
-        method:"POST",
+        provider: paymentForm.type,
+        type: "card",
+        brand: paymentForm.type,
+        last4: paymentForm.details,
+        expiryMonth: Number(paymentForm.expiry.split("/")[0]),
+        expiryYear: Number(`20${paymentForm.expiry.split("/")[1]}`),
+        isDefault: true,
+      };
+      const response = fetch(process.env.NEXT_PUBLIC_API_URL + "/api/users/me/payments", {
+        method: "POST",
         credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                 body: JSON.stringify(paymentMethod),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(paymentMethod),
       })
       const data = await (await response).json()
 
-      if(data.success){
+      if (data.success) {
         setUser({
-                    id: data.data["_id"],
-                    email: data.data["email"],
-                    name: data.data["name"],
-                    savedAddresses: data.data["savedAddresses"],
-                    payment: data.data["savedPaymentMethods"]
-                })
-      }else{
+          id: data.data["_id"],
+          email: data.data["email"],
+          name: data.data["name"],
+          savedAddresses: data.data["savedAddresses"],
+          payment: data.data["savedPaymentMethods"]
+        })
+      } else {
         alert("error")
-        console.log("error occured",data.message)
+        console.log("error occured", data.message)
       }
-    }catch(error){
+    } catch (error) {
       console.log(error)
     }
 
@@ -385,296 +469,297 @@ export default function CheckoutPage() {
 
     setPaymentModal(false);
   };
-   const [paymentForm, setPaymentForm] = useState({
-       type: "visa" as "visa" | "mastercard" | "upi",
-       details: "",
-       expiry: "",
-     });
+  const [paymentForm, setPaymentForm] = useState({
+    type: "visa" as "visa" | "mastercard" | "upi",
+    details: "",
+    expiry: "",
+  });
 
-   if (cartProducts.length === 0) {
+  if (cartProducts.length === 0) {
     return <EmptyCheckout />;
   }
 
-  function clickStep(num:CheckoutStep){
+  function clickStep(num: CheckoutStep) {
     setStep(num)
   }
 
   return (
     <>
-    <main className="min-h-screen overflow-hidden bg-[#F8EFE7] text-[#321D18]">
-      <div className="mx-auto max-w-[1360px] px-4 pb-16 pt-5 sm:px-6 lg:px-8 lg:pt-7">
-        <CheckoutHeader step={step} onBack={goBack} />
-        <CheckoutProgress step={step} clickStep={clickStep} />
+      <main className="min-h-screen overflow-hidden bg-[#F8EFE7] text-[#321D18]">
+        <div className="mx-auto max-w-[1360px] px-4 pb-16 pt-5 sm:px-6 lg:px-8 lg:pt-7">
+          <CheckoutHeader step={step} onBack={goBack} />
+          <CheckoutProgress step={step} clickStep={clickStep} />
 
-        <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_360px] xl:gap-9">
-          <section className="min-w-0">
-            <StepIntro step={step} />
+          <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_360px] xl:gap-9">
+            <section className="min-w-0">
+              <StepIntro step={step} />
 
-            <AnimatePresence mode="wait" initial={false}>
-              {step === 1 && (
-                <motion.div key="step-1" {...stepMotion}>
-                  <OrderStep
-                    cartProducts={cartProducts}
-                    updateQuantity={updateQuantity}
-                    removeItem={removeItem}
-                    onContinue={continueCheckout}
-                  />
-                </motion.div>
-              )}
+              <AnimatePresence mode="wait" initial={false}>
+                {step === 1 && (
+                  <motion.div key="step-1" {...stepMotion}>
+                    <OrderStep
+                      cartProducts={cartProducts}
+                      updateQuantity={updateQuantity}
+                      removeItem={removeItem}
+                      onContinue={continueCheckout}
+                    />
+                  </motion.div>
+                )}
 
-              {step === 2 && (
-                <motion.div key="step-2" {...stepMotion}>
-                  <CouponStep
-                    phone={phone}
-                    setPhone={setPhone}
-                    couponInput={couponInput}
-                    setCouponInput={setCouponInput}
-                    appliedCoupon={appliedCoupon}
-                    couponError={couponError}
-                    applyCoupon={applyCoupon}
-                    applySuggestedCoupon={applySuggestedCoupon}
-                    removeCoupon={removeCoupon}
-                    onContinue={continueCheckout}
-                  />
-                </motion.div>
-              )}
+                {step === 2 && (
+                  <motion.div key="step-2" {...stepMotion}>
+                    <CouponStep
+                      phone={phone}
+                      setPhone={setPhone}
+                      couponInput={couponInput}
+                      setCouponInput={setCouponInput}
+                      appliedCoupon={appliedCoupon}
+                      couponError={couponError}
+                      applyCoupon={applyCoupon}
+                      applySuggestedCoupon={applySuggestedCoupon}
+                      removeCoupon={removeCoupon}
+                      onContinue={continueCheckout}
+                      COUPONS={COUPONS}
+                    />
+                  </motion.div>
+                )}
 
-              {step === 3 && (
-                <motion.div key="step-3" {...stepMotion}>
-                  <DeliveryStep
-                    deliveryMethod={deliveryMethod}
-                    setDeliveryMethod={setDeliveryMethod}
-                    selectedAddress={selectedAddress}
-                    setSelectedAddress={setSelectedAddress}
-                    openAddAddress={openAddAddress}
-                    phone={phone}
-                    deliveryFee={deliveryFee}
-                    onContinue={continueCheckout}
-                  />
-                </motion.div>
-              )}
+                {step === 3 && (
+                  <motion.div key="step-3" {...stepMotion}>
+                    <DeliveryStep
+                      deliveryMethod={deliveryMethod}
+                      setDeliveryMethod={setDeliveryMethod}
+                      selectedAddress={selectedAddress}
+                      setSelectedAddress={setSelectedAddress}
+                      openAddAddress={openAddAddress}
+                      phone={phone}
+                      deliveryFee={deliveryFee}
+                      onContinue={continueCheckout}
+                    />
+                  </motion.div>
+                )}
 
-              {step === 4 && (
-                <motion.div key="step-4" {...stepMotion}>
-                  <PaymentStep
-                  user={user}
-                    paymentMethod={paymentMethod}
-                    setPaymentMethod={setPaymentMethod}
-                    cartProducts={cartProducts}
-                    phone={phone}
-                    deliveryMethod={deliveryMethod}
-                    selectedAddress={selectedAddress}
-                    appliedCoupon={appliedCoupon}
-                    selectedPayment={selectedPayment}
-                    setSelectedPayment={setSelectedPayment}
-                    subtotal={subtotal}
-                    setPaymentModal={setPaymentModal}
-                    deliveryFee={deliveryFee}
-                    discount={discount}
-                    total={total}
-                    placingOrder={placingOrder}
-                    onPlaceOrder={onPlaceOrder}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </section>
+                {step === 4 && (
+                  <motion.div key="step-4" {...stepMotion}>
+                    <PaymentStep
+                      user={user}
+                      paymentMethod={paymentMethod}
+                      setPaymentMethod={setPaymentMethod}
+                      cartProducts={cartProducts}
+                      phone={phone}
+                      deliveryMethod={deliveryMethod}
+                      selectedAddress={selectedAddress}
+                      appliedCoupon={appliedCoupon}
+                      selectedPayment={selectedPayment}
+                      setSelectedPayment={setSelectedPayment}
+                      subtotal={subtotal}
+                      setPaymentModal={setPaymentModal}
+                      deliveryFee={deliveryFee}
+                      discount={discount}
+                      total={total}
+                      placingOrder={placingOrder}
+                      onPlaceOrder={onPlaceOrder}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </section>
 
-          <CheckoutReceipt
-            step={step}
-            cartProducts={cartProducts}
-            subtotal={subtotal}
-            deliveryFee={deliveryFee}
-            discount={discount}
-            total={total}
-            appliedCoupon={appliedCoupon}
-            placingOrder={placingOrder}
-            onAction={continueCheckout}
-          />
+            <CheckoutReceipt
+              step={step}
+              cartProducts={cartProducts}
+              subtotal={subtotal}
+              deliveryFee={deliveryFee}
+              discount={discount}
+              total={total}
+              appliedCoupon={appliedCoupon}
+              placingOrder={placingOrder}
+              onAction={continueCheckout}
+            />
+          </div>
         </div>
-      </div>
-    </main>
-    
-     <AnimatePresence>
-            {addressModal.open && (
-              <Modal
-                title={
-                  addressModal.address
-                    ? "Edit address"
-                    : "Add an address"
+      </main>
+
+      <AnimatePresence>
+        {addressModal.open && (
+          <Modal
+            title={
+              addressModal.address
+                ? "Edit address"
+                : "Add an address"
+            }
+            eyebrow="Delivery"
+            accent="yellow"
+            onClose={() =>
+              setAddressModal({
+                open: false,
+              })
+            }
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectInput
+                label="Address type"
+                value={addressForm.label}
+                onChange={(value) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    label: value,
+                  }))
                 }
-                eyebrow="Delivery"
-                accent="yellow"
-                onClose={() =>
-                  setAddressModal({
-                    open: false,
-                  })
+                options={[
+                  "Home",
+                  "Work",
+                  "Other",
+                ]}
+              />
+
+              <Input
+                label="Name"
+                value={addressForm.name}
+                onChange={(value) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    name: value,
+                  }))
                 }
-              >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <SelectInput
-                    label="Address type"
-                    value={addressForm.label}
-                    onChange={(value) =>
-                      setAddressForm((current) => ({
-                        ...current,
-                        label: value,
-                      }))
-                    }
-                    options={[
-                      "Home",
-                      "Work",
-                      "Other",
-                    ]}
-                  />
-    
-                  <Input
-                    label="Name"
-                    value={addressForm.name}
-                    onChange={(value) =>
-                      setAddressForm((current) => ({
-                        ...current,
-                        name: value,
-                      }))
-                    }
-                  />
-    
-                  <div className="sm:col-span-2">
-                    <Input
-                      label="Address"
-                      value={addressForm.address}
-                      onChange={(value) =>
-                        setAddressForm((current) => ({
-                          ...current,
-                          address: value,
-                        }))
-                      }
-                    />
-                  </div>
-    
-                  <Input
-                    label="City"
-                    value={addressForm.city}
-                    onChange={(value) =>
-                      setAddressForm((current) => ({
-                        ...current,
-                        city: value,
-                      }))
-                    }
-                  />
-    
-                  <Input
-                    label="Pincode"
-                    value={addressForm.pincode}
-                    onChange={(value) =>
-                      setAddressForm((current) => ({
-                        ...current,
-                        pincode: value,
-                      }))
-                    }
-                  />
-    
-                  <div className="sm:col-span-2">
-                    <Input
-                      label="Phone"
-                      value={addressForm.phone}
-                      onChange={(value) =>
-                        setAddressForm((current) => ({
-                          ...current,
-                          phone: value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-    
-                <ModalActions
-                  onCancel={() =>
-                    setAddressModal({
-                      open: false,
-                    })
+              />
+
+              <div className="sm:col-span-2">
+                <Input
+                  label="Address"
+                  value={addressForm.address}
+                  onChange={(value) =>
+                    setAddressForm((current) => ({
+                      ...current,
+                      address: value,
+                    }))
                   }
-                  onSave={saveAddress}
                 />
-              </Modal>
+              </div>
+
+              <Input
+                label="City"
+                value={addressForm.city}
+                onChange={(value) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    city: value,
+                  }))
+                }
+              />
+
+              <Input
+                label="Pincode"
+                value={addressForm.pincode}
+                onChange={(value) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    pincode: value,
+                  }))
+                }
+              />
+
+              <div className="sm:col-span-2">
+                <Input
+                  label="Phone"
+                  value={addressForm.phone}
+                  onChange={(value) =>
+                    setAddressForm((current) => ({
+                      ...current,
+                      phone: value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <ModalActions
+              onCancel={() =>
+                setAddressModal({
+                  open: false,
+                })
+              }
+              onSave={saveAddress}
+            />
+          </Modal>
+        )}
+      </AnimatePresence>
+
+
+      <AnimatePresence>
+        {paymentModal && (
+          <Modal
+            title="Add payment"
+            eyebrow="Checkout"
+            accent="orange"
+            onClose={() =>
+              setPaymentModal(false)
+            }
+          >
+            <SelectInput
+              label="Payment type"
+              value={paymentForm.type}
+              onChange={(value) =>
+                setPaymentForm((current) => ({
+                  ...current,
+                  type:
+                    value as typeof paymentForm.type,
+                }))
+              }
+              options={[
+                "visa",
+                "mastercard",
+                "upi",
+              ]}
+            />
+
+            <div className="mt-4">
+              <Input
+                label={
+                  paymentForm.type === "upi"
+                    ? "UPI ID"
+                    : "Card number"
+                }
+                value={paymentForm.details}
+                onChange={(value) =>
+                  setPaymentForm((current) => ({
+                    ...current,
+                    details: value,
+                  }))
+                }
+                placeholder={
+                  paymentForm.type === "upi"
+                    ? "name@upi"
+                    : "•••• •••• •••• ••••"
+                }
+              />
+            </div>
+
+            {paymentForm.type !== "upi" && (
+              <div className="mt-4">
+                <Input
+                  label="Expiry"
+                  value={paymentForm.expiry}
+                  onChange={(value) =>
+                    setPaymentForm((current) => ({
+                      ...current,
+                      expiry: value,
+                    }))
+                  }
+                  placeholder="MM/YY"
+                />
+              </div>
             )}
-          </AnimatePresence>
 
-
-          <AnimatePresence>
-                  {paymentModal && (
-                    <Modal
-                      title="Add payment"
-                      eyebrow="Checkout"
-                      accent="orange"
-                      onClose={() =>
-                        setPaymentModal(false)
-                      }
-                    >
-                      <SelectInput
-                        label="Payment type"
-                        value={paymentForm.type}
-                        onChange={(value) =>
-                          setPaymentForm((current) => ({
-                            ...current,
-                            type:
-                              value as typeof paymentForm.type,
-                          }))
-                        }
-                        options={[
-                          "visa",
-                          "mastercard",
-                          "upi",
-                        ]}
-                      />
-          
-                      <div className="mt-4">
-                        <Input
-                          label={
-                            paymentForm.type === "upi"
-                              ? "UPI ID"
-                              : "Card number"
-                          }
-                          value={paymentForm.details}
-                          onChange={(value) =>
-                            setPaymentForm((current) => ({
-                              ...current,
-                              details: value,
-                            }))
-                          }
-                          placeholder={
-                            paymentForm.type === "upi"
-                              ? "name@upi"
-                              : "•••• •••• •••• ••••"
-                          }
-                        />
-                      </div>
-          
-                      {paymentForm.type !== "upi" && (
-                        <div className="mt-4">
-                          <Input
-                            label="Expiry"
-                            value={paymentForm.expiry}
-                            onChange={(value) =>
-                              setPaymentForm((current) => ({
-                                ...current,
-                                expiry: value,
-                              }))
-                            }
-                            placeholder="MM/YY"
-                          />
-                        </div>
-                      )}
-          
-                      <ModalActions
-                        onCancel={() =>
-                          setPaymentModal(false)
-                        }
-                        onSave={savePayment}
-                      />
-                    </Modal>
-                  )}
-                </AnimatePresence>
+            <ModalActions
+              onCancel={() =>
+                setPaymentModal(false)
+              }
+              onSave={savePayment}
+            />
+          </Modal>
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -717,8 +802,8 @@ function CheckoutHeader({ step, onBack }: { step: CheckoutStep; onBack: () => vo
   );
 }
 
-function CheckoutProgress({ step, clickStep }: { step: CheckoutStep; clickStep: (num:CheckoutStep)=>void; }) {
-  
+function CheckoutProgress({ step, clickStep }: { step: CheckoutStep; clickStep: (num: CheckoutStep) => void; }) {
+
   return (
     <div className="mb-7 overflow-x-auto pb-1 scrollbar-none">
       <div className="flex min-w-[620px] items-center rounded-full border border-[#4A1E1C]/10 bg-white/75 p-1.5 shadow-sm backdrop-blur">
@@ -727,7 +812,7 @@ function CheckoutProgress({ step, clickStep }: { step: CheckoutStep; clickStep: 
           const current = step === item.number;
 
           return (
-            <div key={item.number} onClick={()=>clickStep(index+1 as CheckoutStep)} className="flex min-w-0 flex-1 items-center cursor-pointer  "  >
+            <div key={item.number} onClick={() => clickStep(index + 1 as CheckoutStep)} className="flex min-w-0 flex-1 items-center cursor-pointer  "  >
               <div className="relative flex min-w-0 flex-1 items-center gap-2.5 rounded-full px-3 py-2">
                 {current && (
                   <motion.div
@@ -740,17 +825,15 @@ function CheckoutProgress({ step, clickStep }: { step: CheckoutStep; clickStep: 
                 <motion.div
                   animate={{ scale: current ? [1, 1.08, 1] : 1 }}
                   transition={{ duration: 0.8 }}
-                  className={`relative z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
-                    complete || current ? "bg-[#3D1715] text-white" : "bg-[#F1E6DC] text-[#9A8378]"
-                  }`}
+                  className={`relative z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${complete || current ? "bg-[#3D1715] text-white" : "bg-[#F1E6DC] text-[#9A8378]"
+                    }`}
                 >
                   {complete ? <Check size={13} strokeWidth={3} /> : item.number}
                 </motion.div>
 
                 <span
-                  className={`relative z-[1] hidden truncate text-sm font-header uppercase tracking-[0.08em] sm:block ${
-                    current ? "text-[#3D1715]" : complete ? "text-[#66504A]" : "text-[#A38E84]"
-                  }`}
+                  className={`relative z-[1] hidden truncate text-sm font-header uppercase tracking-[0.08em] sm:block ${current ? "text-[#3D1715]" : complete ? "text-[#66504A]" : "text-[#A38E84]"
+                    }`}
                 >
                   {item.label}
                 </span>
@@ -816,7 +899,7 @@ function CheckoutReceipt({
   deliveryFee: number;
   discount: number;
   total: number;
-  appliedCoupon: Coupon | null;
+  appliedCoupon: CouponType | null;
   placingOrder: boolean;
   onAction: () => void;
 }) {
@@ -931,13 +1014,13 @@ function CheckoutReceipt({
             </p>
           </div>
         </div>
-          <motion.div
-            animate={{ y: [0, -5, 0], rotate: [-3, 3, -3] }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-            className="text-9xl absolute -right-10 -top-5"
-          >
-            🍪
-          </motion.div>
+        <motion.div
+          animate={{ y: [0, -5, 0], rotate: [-3, 3, -3] }}
+          transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+          className="text-9xl absolute -right-10 -top-5"
+        >
+          🍪
+        </motion.div>
       </motion.div>
     </motion.aside>
   );
@@ -950,8 +1033,8 @@ function OrderStep({
   onContinue,
 }: {
   cartProducts: { product: any; quantity: number }[];
-  updateQuantity: (productId: string, quantity: number) => void;
-  removeItem: (productId: string) => void;
+  updateQuantity: (productId: number, quantity: number) => void;
+  removeItem: (productId: number) => void;
   onContinue: () => void;
 }) {
   return (
@@ -1002,7 +1085,7 @@ function OrderStep({
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeItem(String(product._id))}
+                        onClick={() => removeItem(product._id)}
                         aria-label={`Remove ${product.name}`}
                         className="rounded-full p-2 text-[#A59085] transition hover:bg-[#F9EDEA] hover:text-[#9D443C] sm:hidden"
                       >
@@ -1013,8 +1096,8 @@ function OrderStep({
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                       <QuantityControl
                         quantity={quantity}
-                        onDecrease={() => updateQuantity(String(product._id), quantity - 1)}
-                        onIncrease={() => updateQuantity(String(product._id), quantity + 1)}
+                        onDecrease={() => updateQuantity(product._id, quantity - 1)}
+                        onIncrease={() => updateQuantity(product._id, quantity + 1)}
                       />
 
                       <motion.p
@@ -1029,7 +1112,7 @@ function OrderStep({
 
                     <button
                       type="button"
-                      onClick={() => removeItem(String(product._id))}
+                      onClick={() => removeItem(product._id)}
                       className="mt-3 hidden items-center gap-1.5 text-[10px] font-text font-semibold text-[#9A8177] transition hover:text-[#9D443C] sm:flex"
                     >
                       <Trash2 size={12} />
@@ -1065,17 +1148,19 @@ function CouponStep({
   applySuggestedCoupon,
   removeCoupon,
   onContinue,
+  COUPONS
 }: {
   phone: string;
   setPhone: (value: string) => void;
   couponInput: string;
   setCouponInput: (value: string) => void;
-  appliedCoupon: Coupon | null;
+  appliedCoupon: CouponType | null;
   couponError: string;
   applyCoupon: () => void;
-  applySuggestedCoupon: (coupon: Coupon) => void;
+  applySuggestedCoupon: (coupon: CouponType) => void;
   removeCoupon: () => void;
   onContinue: () => void;
+  COUPONS: any[];
 }) {
   return (
     <div className="space-y-4">
@@ -1138,13 +1223,17 @@ function CouponStep({
                   onClick={() => applySuggestedCoupon(coupon)}
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
-                  className={`flex items-center justify-between rounded-[18px] border p-4 text-left transition ${
-                    selected ? "border-[#3D1715] bg-white" : "border-[#3D1715]/10 bg-white/55 hover:bg-white/80"
-                  }`}
+                  className={`flex items-center justify-between rounded-[18px] border p-4 text-left transition ${selected ? "border-[#3D1715] bg-white" : "border-[#3D1715]/10 bg-white/55 hover:bg-white/80"
+                    }`}
                 >
                   <div>
                     <p className="text-xs font-text font-bold text-[#3D1715]">{coupon.code}</p>
-                    <p className="mt-1 text-[10px] font-text text-[#7D6257]">{coupon.label}</p>
+                    <p className="mt-1 text-[10px] font-text text-[#7D6257]">
+                      {coupon.discountType == "FIXED" && `Flat ${coupon.discountValue}`}
+                      {coupon.discountType == "PERCENTAGE" && `${coupon.discountValue}% up to ${coupon.maximumDiscount ?? coupon.discountValue}`}
+                      <br />
+                      Min Order: {coupon.minimumOrderValue}
+                    </p>
                   </div>
                   {selected ? <CheckCircle2 size={17} /> : <ArrowRight size={15} />}
                 </motion.button>
@@ -1164,7 +1253,7 @@ function CouponStep({
                   <Check size={16} />
                   <div>
                     <p className="text-xs font-black">{appliedCoupon.code}</p>
-                    <p className="text-[10px] font-medium">{appliedCoupon.label} applied</p>
+                    <p className="text-[10px] font-medium">{appliedCoupon.code} applied</p>
                   </div>
                 </div>
                 <button type="button" onClick={removeCoupon} className="rounded-full p-1.5 hover:bg-black/5">
@@ -1227,12 +1316,12 @@ function DeliveryStep({
   setDeliveryMethod: (value: "delivery" | "pickup") => void;
   selectedAddress: SavedAddress | null;
   setSelectedAddress: React.Dispatch<React.SetStateAction<SavedAddress | null>>;
-  openAddAddress: ()=>void;
+  openAddAddress: () => void;
   phone: string;
   deliveryFee: number;
   onContinue: () => void;
 }) {
-  const {user} = useAuthStore()
+  const { user } = useAuthStore()
   return (
     <div className="space-y-4" >
       <div className="grid gap-3 sm:grid-cols-2">
@@ -1261,31 +1350,31 @@ function DeliveryStep({
           >
             <div className="flex justify-between items-center">
 
-            <div className="border-b border-[#EDE1D7] px-5 py-5 sm:px-7">
-              <h3 className="mt-1 text-base font-header font-bold text-[#3D1715]">WHERE SHOULD WE BRING IT?</h3>
-              <p className="mt-1 text-xs text-[#816D64] font-text">Choose one of your saved delivery addresses.</p>
-            </div>
-            <button onClick={openAddAddress} className="flex items-center mr-5 font-header tracking-wider rounded-sm text-white py-2 cursor-pointer px-3 justify-center text-xs gap-2 bg-[var(--foreground)] h-max w-max">
-              <Plus size={14} /> Add Address
-            </button>
+              <div className="border-b border-[#EDE1D7] px-5 py-5 sm:px-7">
+                <h3 className="mt-1 text-base font-header font-bold text-[#3D1715]">WHERE SHOULD WE BRING IT?</h3>
+                <p className="mt-1 text-xs text-[#816D64] font-text">Choose one of your saved delivery addresses.</p>
+              </div>
+              <button onClick={openAddAddress} className="flex items-center mr-5 font-header tracking-wider rounded-sm text-white py-2 cursor-pointer px-3 justify-center text-xs gap-2 bg-[var(--foreground)] h-max w-max">
+                <Plus size={14} /> Add Address
+              </button>
             </div>
             <div className="p-4 sm:p-6">
               {/* <AddressPicker value={selectedAddress} onChange={setSelectedAddress} /> */}
-              {user?.savedAddresses.map((address,index)=>(
+              {user?.savedAddresses.map((address, index) => (
                 <div key={address._id}>
-                    <AddressCard 
-                      key={address.id}
-                  address={address}
-                  index={index}
-                  selectedAddress={selectedAddress}
-                  setSelectedAddress={setSelectedAddress}
-                  onEdit={() =>{}
-                  }
-                  onRemove={() =>{}
-                  }
-                  onDefault={() =>{}
-                  }
-                    />
+                  <AddressCard
+                    key={address.id}
+                    address={address}
+                    index={index}
+                    selectedAddress={selectedAddress}
+                    setSelectedAddress={setSelectedAddress}
+                    onEdit={() => { }
+                    }
+                    onRemove={() => { }
+                    }
+                    onDefault={() => { }
+                    }
+                  />
                 </div>
               ))}
             </div>
@@ -1353,7 +1442,7 @@ function PaymentStep({
   phone: string;
   deliveryMethod: "delivery" | "pickup";
   selectedAddress: SavedAddress | null;
-  appliedCoupon: Coupon | null;
+  appliedCoupon: CouponType | null;
   subtotal: number;
   deliveryFee: number;
   discount: number;
@@ -1363,61 +1452,61 @@ function PaymentStep({
   setPaymentModal: React.Dispatch<React.SetStateAction<boolean>>;
   onPlaceOrder: () => void;
   selectedPayment: SavedPaymentMethod | null;
-  setSelectedPayment: React.Dispatch<React.SetStateAction<SavedPaymentMethod|null>>;
+  setSelectedPayment: React.Dispatch<React.SetStateAction<SavedPaymentMethod | null>>;
 }) {
-  const {setUser} = useAuthStore()
+  const { setUser } = useAuthStore()
   const removePayment = async (id: string) => {
-       
-    try{
-      const response  = fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/me/payments/${id}`,{
-        method:"DELETE",
+
+    try {
+      const response = fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/me/payments/${id}`, {
+        method: "DELETE",
         credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+        headers: {
+          "Content-Type": "application/json",
+        },
       })
       const data = await (await response).json()
 
-      if(data.success){
+      if (data.success) {
         setUser({
-                    id: data.data["_id"],
-                    email: data.data["email"],
-                    name: data.data["name"],
-                    savedAddresses: data.data["savedAddresses"],
-                    payment: data.data["savedPaymentMethods"]
-                })
-      }else{
+          id: data.data["_id"],
+          email: data.data["email"],
+          name: data.data["name"],
+          savedAddresses: data.data["savedAddresses"],
+          payment: data.data["savedPaymentMethods"]
+        })
+      } else {
         alert("error")
-        console.log("error occured",data.message)
+        console.log("error occured", data.message)
       }
-    }catch(error){
+    } catch (error) {
       console.log(error)
     }
   };
-   const setDefaultPayment = async (id: string) => {
-     try{
-      const response  = fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/me/payments/${id}/default`,{
-        method:"PATCH",
+  const setDefaultPayment = async (id: string) => {
+    try {
+      const response = fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/me/payments/${id}/default`, {
+        method: "PATCH",
         credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+        headers: {
+          "Content-Type": "application/json",
+        },
       })
       const data = await (await response).json()
 
-      if(data.success){
+      if (data.success) {
         setUser({
-                    id: data.data["_id"],
-                    email: data.data["email"],
-                    name: data.data["name"],
-                    savedAddresses: data.data["savedAddresses"],
-                    payment: data.data["savedPaymentMethods"]
-                })
-      }else{
+          id: data.data["_id"],
+          email: data.data["email"],
+          name: data.data["name"],
+          savedAddresses: data.data["savedAddresses"],
+          payment: data.data["savedPaymentMethods"]
+        })
+      } else {
         alert("error")
-        console.log("error occured",data.message)
+        console.log("error occured", data.message)
       }
-    }catch(error){
+    } catch (error) {
       console.log(error)
     }
   };
@@ -1430,30 +1519,30 @@ function PaymentStep({
         <PaymentOption selected={paymentMethod === "cod"} icon={<WalletCards size={20} />} title="CASH ON DELIVERY" description="Pay when it arrives" onClick={() => setPaymentMethod("cod")} />
       </div>
 
-      {paymentMethod=="card" &&
-      <div className="px-10 py-5 rounded-3xl shadow-xs bg-white">
-        <div className="flex items-center gap-2">
+      {paymentMethod == "card" &&
+        <div className="px-10 py-5 rounded-3xl shadow-xs bg-white">
+          <div className="flex items-center gap-2">
             <CreditCard size={17} className="text-[#3B8658]" />
-              <h3 className="mt-1 text-base font-header text-[#3D1715]">Select Card to pay</h3>
-              <button onClick={() =>
-                  setPaymentModal(true)
-                } className="ml-auto text-sm font-text font-semibold flex items-center gap-2 cursor-pointer"><Plus size={14}/>Add card</button>
+            <h3 className="mt-1 text-base font-header text-[#3D1715]">Select Card to pay</h3>
+            <button onClick={() =>
+              setPaymentModal(true)
+            } className="ml-auto text-sm font-text font-semibold flex items-center gap-2 cursor-pointer"><Plus size={14} />Add card</button>
           </div>
-      <div className="grid grid-cols-2 gap-10">
-        {user?.payment.map((payment, index) => (
-                <PaymentCard
-                   selectedPayment={selectedPayment} 
-                   setSelectedPayment={setSelectedPayment}
-                  key={payment.paymentMethodId}
-                  payment={payment}
-                  index={index}
-                  onRemove={() =>removePayment(payment.paymentMethodId)}
-                  onDefault={() =>setDefaultPayment(payment.paymentMethodId)}
-                />
-              ))}
-        
-      </div>
-      </div>}
+          <div className="grid grid-cols-2 gap-10">
+            {user?.payment.map((payment, index) => (
+              <PaymentCard
+                selectedPayment={selectedPayment}
+                setSelectedPayment={setSelectedPayment}
+                key={payment.paymentMethodId}
+                payment={payment}
+                index={index}
+                onRemove={() => removePayment(payment.paymentMethodId)}
+                onDefault={() => setDefaultPayment(payment.paymentMethodId)}
+              />
+            ))}
+
+          </div>
+        </div>}
 
       <section className="overflow-hidden rounded-[28px] border border-[#4A1E1C]/10 bg-white shadow-[0_8px_30px_rgba(61,24,20,0.035)]">
         <div className="border-b border-[#EDE1D7] px-5 py-5 sm:px-7">
@@ -1537,9 +1626,8 @@ function DeliveryMethodCard({
       onClick={onClick}
       whileHover={{ y: -3 }}
       whileTap={{ scale: 0.985 }}
-      className={`relative overflow-hidden rounded-[25px] border p-5 text-left transition sm:p-6 ${
-        selected ? "border-[#3D1715] bg-[#FFF0B0]" : "border-[#4A1E1C]/10 bg-white hover:bg-[#FFFBF6]"
-      }`}
+      className={`relative overflow-hidden rounded-[25px] border p-5 text-left transition sm:p-6 ${selected ? "border-[#3D1715] bg-[#FFF0B0]" : "border-[#4A1E1C]/10 bg-white hover:bg-[#FFFBF6]"
+        }`}
     >
       {selected && <motion.div layoutId="delivery-selected" className="absolute inset-x-0 bottom-0 h-1 bg-[#3D1715]" />}
       <div className="flex items-start justify-between gap-4">
@@ -1770,7 +1858,7 @@ function AddressCard({
 
   return (
     <motion.div
-    onClick={()=>setSelectedAddress(address)}
+      onClick={() => setSelectedAddress(address)}
       layout
       initial={{
         opacity: 0,
@@ -1783,25 +1871,23 @@ function AddressCard({
       transition={{
         delay: index * 0.05,
       }}
-      className={`group relative overflow-hidden cursor-pointer rounded-[30px] ${isActive?"bg-green-100":"bg-white"} p-5 shadow-[0_8px_30px_rgba(54,25,20,0.055)] sm:p-6`}
+      className={`group relative overflow-hidden cursor-pointer rounded-[30px] ${isActive ? "bg-green-100" : "bg-white"} p-5 shadow-[0_8px_30px_rgba(54,25,20,0.055)] sm:p-6`}
     >
       {/* Corner decoration */}
       <div
-        className={`absolute right-0 top-0 h-16 w-16 rounded-bl-[45px] ${
-          address.isDefault
-            ? "bg-[#FFD522]"
-            : "bg-[#F0E6DF]"
-        }`}
+        className={`absolute right-0 top-0 h-16 w-16 rounded-bl-[45px] ${address.isDefault
+          ? "bg-[#FFD522]"
+          : "bg-[#F0E6DF]"
+          }`}
       />
 
       <div className="relative z-10">
         <div className="flex items-start gap-4">
           <div
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[17px] ${
-              address.isDefault
-                ? "bg-[#321513] text-white"
-                : "bg-[#F6EEE7] text-[#321513]"
-            }`}
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[17px] ${address.isDefault
+              ? "bg-[#321513] text-white"
+              : "bg-[#F6EEE7] text-[#321513]"
+              }`}
           >
             <Icon
               size={20}
@@ -1845,7 +1931,7 @@ function AddressCard({
             <Pencil size={14} />
           </button> */}
           <div className="p-1 border-2 border-[var(--foreground)] rounded-full">
-              <div className={`p-2 rounded-full transition duration-300 ${isActive ? "bg-[var(--foreground)]":"bg-[transparent]"}`} />
+            <div className={`p-2 rounded-full transition duration-300 ${isActive ? "bg-[var(--foreground)]" : "bg-[transparent]"}`} />
           </div>
         </div>
 
@@ -1886,14 +1972,14 @@ function PaymentCard({
   onDefault,
   selectedPayment,
   setSelectedPayment
-  
+
 }: {
   payment: SavedPaymentMethod;
   index: number;
   onRemove: () => void;
   onDefault: () => void;
   selectedPayment: SavedPaymentMethod | null;
-  setSelectedPayment: React.Dispatch<React.SetStateAction<SavedPaymentMethod|null>>;
+  setSelectedPayment: React.Dispatch<React.SetStateAction<SavedPaymentMethod | null>>;
 }) {
   const isUPI = payment.type === "upi";
   const isActive = payment == selectedPayment;
@@ -1911,24 +1997,22 @@ function PaymentCard({
       transition={{
         delay: index * 0.05,
       }}
-      onClick={()=>setSelectedPayment(payment)}
+      onClick={() => setSelectedPayment(payment)}
       className={`group relative overflow-hidden cursor-pointer rounded-[30px] border-2 ${isActive ? "bg-green-100 border-green-500 " : "border-[transparent] bg-white"} p-5 shadow-[0_8px_30px_rgba(54,25,20,0.055)] sm:p-6`}
     >
       <div
-        className={`absolute right-0 top-0 h-14 w-14 rounded-bl-[40px] ${
-          payment.isDefault
-            ? "bg-[#FF7043]"
-            : "bg-[#F0E6DF]"
-        }`}
+        className={`absolute right-0 top-0 h-14 w-14 rounded-bl-[40px] ${payment.isDefault
+          ? "bg-[#FF7043]"
+          : "bg-[#F0E6DF]"
+          }`}
       />
 
       <div className="relative z-10 flex items-center gap-4">
         <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[17px] ${
-            payment.isDefault
-              ? "bg-[#321513] text-white"
-              : "bg-[#F6EEE7] text-[#321513]"
-          }`}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[17px] ${payment.isDefault
+            ? "bg-[#321513] text-white"
+            : "bg-[#F6EEE7] text-[#321513]"
+            }`}
         >
           {isUPI ? (
             <WalletCards
@@ -2128,11 +2212,10 @@ function Modal({
         className="relative max-h-[92vh] w-full overflow-y-auto rounded-t-[32px] bg-[#FFFDFC] p-6 shadow-2xl sm:max-w-xl sm:rounded-[32px] sm:p-8"
       >
         <div
-          className={`absolute left-0 top-0 h-2 w-full ${
-            accent === "yellow"
-              ? "bg-[#FFD522]"
-              : "bg-[#FF7043]"
-          }`}
+          className={`absolute left-0 top-0 h-2 w-full ${accent === "yellow"
+            ? "bg-[#FFD522]"
+            : "bg-[#FF7043]"
+            }`}
         />
 
         <div className="mb-7 flex items-start justify-between gap-5">

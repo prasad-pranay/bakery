@@ -24,7 +24,7 @@ export const validateCoupon = async (req: Request, res: Response) => {
   }
 };
 
-// Admin only
+
 export const getCoupons = async (req: Request, res: Response) => {
   try {
     const coupons = await Coupon.find({});

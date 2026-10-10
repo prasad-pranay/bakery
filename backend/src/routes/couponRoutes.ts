@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.post('/validate', validateCoupon); // Public or authenticated user can validate
 
-router.get('/', requireAdmin, getCoupons);
+router.get('/', getCoupons);
 router.post('/', requireAdmin, createCoupon);
 router.put('/:id', requireAdmin, updateCoupon);
 router.delete('/:id', requireAdmin, deleteCoupon);

@@ -24,7 +24,7 @@ import { useEffect, useRef } from "react";
 import {
     useReducedMotion,
 } from "framer-motion";
-import {Product,Category} from "../type/product";
+import { Product, Category } from "../type/product";
 import { useAuthStore } from "../store/authStore";
 import { cartItemType, cartAddBackend, cartUpdateBackend, cartItemRemove } from "../type/cart";
 /* -------------------------------------------------------------------------- */
@@ -484,11 +484,11 @@ const TICKER = [
 
 export default function ProductsPage() {
     const reduce = useReducedMotion();
-    
-     const [activeCategory, setActiveCategory] =
-         useState<Category>("All");
 
-    const {  products, cart, setCartItem, toggleShowCart } = useAuthStore();
+    const [activeCategory, setActiveCategory] =
+        useState<Category>("All");
+
+    const { products, cart, setCartItem, toggleShowCart } = useAuthStore();
 
     const [search, setSearch] = useState("");
     const [sort, setSort] = useState<Sort>("popular");
@@ -509,7 +509,7 @@ export default function ProductsPage() {
         return () => list.forEach((t) => window.clearTimeout(t));
     }, []);
 
-    function filter_Products(){
+    function filter_Products() {
         let result = [...products];
 
         if (activeCategory !== "All") {
@@ -554,7 +554,7 @@ export default function ProductsPage() {
     }
     const filteredProducts = useMemo(() => {
         return filter_Products();
-    }, [activeCategory, search, sort, onlyFavorites, favorites,products]);
+    }, [activeCategory, search, sort, onlyFavorites, favorites, products]);
 
     const hasFilters =
         activeCategory !== "All" ||
@@ -576,8 +576,8 @@ export default function ProductsPage() {
         };
 
         const response = await cartAddBackend(data);
-        
-        if(response.success){
+
+        if (response.success) {
             setCartItem(response.data);
             setAddedProduct(id);
             setToast("Added to bag");
@@ -587,7 +587,7 @@ export default function ProductsPage() {
                     setAddedProduct(null);
                 }, 2000)
             );
-        }else{
+        } else {
             setToast(response.message || "Failed to add to bag");
             timers.current.push(
                 window.setTimeout(() => setToast(null), 2000)
@@ -596,45 +596,45 @@ export default function ProductsPage() {
         }
     };
     const showToast = (message: string, duration = 2000) => {
-    setToast(message);
+        setToast(message);
 
-    timers.current.push(
-        window.setTimeout(() => {
-            setToast(null);
-        }, duration)
-    );
-};
+        timers.current.push(
+            window.setTimeout(() => {
+                setToast(null);
+            }, duration)
+        );
+    };
 
-async function updateBag(id: number, quantity: number) {
-    try {
-        const response =
-            quantity === 0
-                ? await cartItemRemove(id)
-                : await cartUpdateBackend(id, quantity);
+    async function updateBag(id: number, quantity: number) {
+        try {
+            const response =
+                quantity === 0
+                    ? await cartItemRemove(id)
+                    : await cartUpdateBackend(id, quantity);
 
-        if (!response.success) {
-            showToast(response.message || "Failed to update value");
-            return;
+            if (!response.success) {
+                showToast(response.message || "Failed to update value");
+                return;
+            }
+
+            setCartItem(response.data);
+            showToast(quantity == 0 ? "Item removed from bag" : "Bag updated");
+            if (quantity != 0) {
+                setAddedProduct(id);
+                timers.current.push(
+                    window.setTimeout(() => {
+                        setAddedProduct(null);
+                    }, 2000)
+                );
+            } else {
+                setAddedProduct(null);
+            }
+
+        } catch (error) {
+            console.error("Failed to update bag:", error);
+            showToast("Something went wrong");
         }
-
-        setCartItem(response.data);
-        showToast(quantity==0 ? "Item removed from bag" : "Bag updated");
-        if(quantity != 0){
-            setAddedProduct(id);
-            timers.current.push(
-                window.setTimeout(() => {
-                    setAddedProduct(null);
-                }, 2000)
-            );
-        }else{
-            setAddedProduct(null);
-        }
-
-    } catch (error) {
-        console.error("Failed to update bag:", error);
-        showToast("Something went wrong");
     }
-}
 
 
 
@@ -652,12 +652,12 @@ async function updateBag(id: number, quantity: number) {
         });
 
     return (
-<main className="w-full overflow-x-hidden text-[#321714]">
+        <main className="w-full overflow-x-hidden text-[#321714]">
 
-    {/* ================= TICKER ================= */}
-    <div
-        aria-hidden="true"
-        className="
+            {/* ================= TICKER ================= */}
+            <div
+                aria-hidden="true"
+                className="
             group relative mt-4 w-full
             -rotate-[0.6deg]
             overflow-hidden
@@ -665,25 +665,25 @@ async function updateBag(id: number, quantity: number) {
             bg-[#FFD91A]
             sm:mt-5
         "
-    >
-        <motion.div
-            animate={reduce ? undefined : { x: ["0%", "-50%"] }}
-            transition={{
-                duration: 28,
-                repeat: Infinity,
-                ease: "linear",
-            }}
-            className="flex w-max"
-        >
-            {[0, 1, 2, 3].map((group) => (
-                <div
-                    key={group}
-                    className="flex items-center"
+            >
+                <motion.div
+                    animate={reduce ? undefined : { x: ["0%", "-50%"] }}
+                    transition={{
+                        duration: 28,
+                        repeat: Infinity,
+                        ease: "linear",
+                    }}
+                    className="flex w-max"
                 >
-                    {TICKER.map((item, i) => (
-                        <span
-                            key={`${group}-${i}`}
-                            className="
+                    {[0, 1, 2, 3].map((group) => (
+                        <div
+                            key={group}
+                            className="flex items-center"
+                        >
+                            {TICKER.map((item, i) => (
+                                <span
+                                    key={`${group}-${i}`}
+                                    className="
                                 whitespace-nowrap
                                 px-4 py-2.5
                                 text-[9px]
@@ -694,31 +694,31 @@ async function updateBag(id: number, quantity: number) {
                                 sm:text-[11px]
                                 sm:tracking-[0.16em]
                             "
-                        >
-                            {item}
-                        </span>
+                                >
+                                    {item}
+                                </span>
+                            ))}
+                        </div>
                     ))}
-                </div>
-            ))}
-        </motion.div>
-    </div>
+                </motion.div>
+            </div>
 
 
-    {/* ================= SHOP ================= */}
-    <section
-        ref={shopRef}
-        className="
+            {/* ================= SHOP ================= */}
+            <section
+                ref={shopRef}
+                className="
             mt-8
             px-4
             sm:mt-10 sm:px-6
             lg:px-8
             xl:px-10
         "
-    >
+            >
 
-        {/* ================= SHOP HEADER ================= */}
-        <div
-            className="
+                {/* ================= SHOP HEADER ================= */}
+                <div
+                    className="
                 mb-7
                 flex flex-col
                 gap-6
@@ -727,28 +727,28 @@ async function updateBag(id: number, quantity: number) {
                 lg:items-end
                 lg:justify-between
             "
-        >
+                >
 
-            {/* Heading */}
-            <div className="min-w-0">
-                <h1
-                    className="
+                    {/* Heading */}
+                    <div className="min-w-0">
+                        <h1
+                            className="
                         font-title
                         text-[clamp(3.2rem,13vw,7.6rem)]
                         leading-[0.82]
                         tracking-[1px]
                     "
-                >
-                    ALL THE
-                    <br />
+                        >
+                            ALL THE
+                            <br />
 
-                    <span className="relative inline-block">
-                        GOOD STUFF
+                            <span className="relative inline-block">
+                                GOOD STUFF
 
-                        <svg
-                            aria-hidden="true"
-                            viewBox="0 0 300 20"
-                            className="
+                                <svg
+                                    aria-hidden="true"
+                                    viewBox="0 0 300 20"
+                                    className="
                                 absolute
                                 -bottom-2
                                 left-0
@@ -756,45 +756,45 @@ async function updateBag(id: number, quantity: number) {
                                 sm:-bottom-4
                                 sm:w-[72%]
                             "
-                            fill="none"
-                        >
-                            <motion.path
-                                d="M3 12C61 3 139 17 297 6"
-                                stroke="#FFD91A"
-                                strokeWidth="7"
-                                strokeLinecap="round"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: 1 }}
-                                transition={{
-                                    delay: 0.6,
-                                    duration: 0.9,
-                                    ease: "easeOut",
-                                }}
-                            />
-                        </svg>
-                    </span>
-                </h1>
-            </div>
+                                    fill="none"
+                                >
+                                    <motion.path
+                                        d="M3 12C61 3 139 17 297 6"
+                                        stroke="#FFD91A"
+                                        strokeWidth="7"
+                                        strokeLinecap="round"
+                                        initial={{ pathLength: 0 }}
+                                        animate={{ pathLength: 1 }}
+                                        transition={{
+                                            delay: 0.6,
+                                            duration: 0.9,
+                                            ease: "easeOut",
+                                        }}
+                                    />
+                                </svg>
+                            </span>
+                        </h1>
+                    </div>
 
 
-            {/* Hero Product */}
-            <motion.div
-                initial={{
-                    opacity: 0,
-                    scale: 0.88,
-                    rotate: 4,
-                }}
-                animate={{
-                    opacity: 1,
-                    scale: 1,
-                    rotate: 0,
-                }}
-                transition={{
-                    duration: 0.9,
-                    delay: 0.12,
-                    ease: EASE,
-                }}
-                className="
+                    {/* Hero Product */}
+                    <motion.div
+                        initial={{
+                            opacity: 0,
+                            scale: 0.88,
+                            rotate: 4,
+                        }}
+                        animate={{
+                            opacity: 1,
+                            scale: 1,
+                            rotate: 0,
+                        }}
+                        transition={{
+                            duration: 0.9,
+                            delay: 0.12,
+                            ease: EASE,
+                        }}
+                        className="
                     relative
                     mx-auto
                     flex
@@ -807,11 +807,11 @@ async function updateBag(id: number, quantity: number) {
                     lg:max-w-[360px]
                     xl:max-w-[400px]
                 "
-            >
-                <motion.img
-                    src="/product-hero.png"
-                    alt="Fresh chocolate chip cookies"
-                    className="
+                    >
+                        <motion.img
+                            src="/product-hero.png"
+                            alt="Fresh chocolate chip cookies"
+                            className="
                         relative
                         z-10
                         w-full
@@ -819,45 +819,45 @@ async function updateBag(id: number, quantity: number) {
                         drop-shadow-[0_25px_20px_rgba(50,23,20,0.18)]
                         sm:drop-shadow-[0_30px_25px_rgba(50,23,20,0.2)]
                     "
-                    animate={
-                        reduce
-                            ? undefined
-                            : {
-                                  y: [0, -8, 0],
-                                  rotate: [-1, 1, -1],
-                              }
-                    }
-                    transition={{
-                        duration: 5,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                    }}
-                    whileHover={{
-                        scale: 1.05,
-                        rotate: 3,
-                    }}
-                    whileTap={{
-                        scale: 0.97,
-                        rotate: -3,
-                    }}
-                />
+                            animate={
+                                reduce
+                                    ? undefined
+                                    : {
+                                        y: [0, -8, 0],
+                                        rotate: [-1, 1, -1],
+                                    }
+                            }
+                            transition={{
+                                duration: 5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                            }}
+                            whileHover={{
+                                scale: 1.05,
+                                rotate: 3,
+                            }}
+                            whileTap={{
+                                scale: 0.97,
+                                rotate: -3,
+                            }}
+                        />
 
-                <motion.div
-                    initial={{
-                        opacity: 0,
-                        rotate: 14,
-                        scale: 0.8,
-                    }}
-                    animate={{
-                        opacity: 1,
-                        rotate: 9,
-                        scale: 1,
-                    }}
-                    transition={{
-                        delay: 0.55,
-                        duration: 0.45,
-                    }}
-                    className="
+                        <motion.div
+                            initial={{
+                                opacity: 0,
+                                rotate: 14,
+                                scale: 0.8,
+                            }}
+                            animate={{
+                                opacity: 1,
+                                rotate: 9,
+                                scale: 1,
+                            }}
+                            transition={{
+                                delay: 0.55,
+                                duration: 0.45,
+                            }}
+                            className="
                         absolute
                         -right-1
                         -top-3
@@ -871,21 +871,21 @@ async function updateBag(id: number, quantity: number) {
                         sm:-top-5
                         sm:text-[13px]
                     "
-                >
-                    cookies
-                    <br />
-                    make life
-                    <br />
-                    better ♡
-                </motion.div>
-            </motion.div>
+                        >
+                            cookies
+                            <br />
+                            make life
+                            <br />
+                            better ♡
+                        </motion.div>
+                    </motion.div>
 
-        </div>
+                </div>
 
 
-        {/* ================= MAIN CONTAINER ================= */}
-        <div
-            className="
+                {/* ================= MAIN CONTAINER ================= */}
+                <div
+                    className="
                 grid
                 grid-cols-1
                 gap-6
@@ -893,35 +893,35 @@ async function updateBag(id: number, quantity: number) {
                 lg:gap-8
                 xl:grid-cols-[190px_minmax(0,1fr)]
             "
-        >
+                >
 
-            {/* ================= DESKTOP SIDEBAR ================= */}
-            <aside className="hidden lg:block">
-                <div className="sticky top-24 h-max">
-                    <div className="space-y-1">
-                        {categories.map((category) => (
-                            <CategoryButton
-                                key={category.name}
-                                category={category}
-                                active={
-                                    activeCategory === category.name
-                                }
-                                onClick={() =>
-                                    setActiveCategory(category.name)
-                                }
-                            />
-                        ))}
-                    </div>
-                </div>
-            </aside>
+                    {/* ================= DESKTOP SIDEBAR ================= */}
+                    <aside className="hidden lg:block">
+                        <div className="sticky top-24 h-max">
+                            <div className="space-y-1">
+                                {categories.map((category) => (
+                                    <CategoryButton
+                                        key={category.name}
+                                        category={category}
+                                        active={
+                                            activeCategory === category.name
+                                        }
+                                        onClick={() =>
+                                            setActiveCategory(category.name)
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </aside>
 
 
-            {/* ================= PRODUCTS AREA ================= */}
-            <div className="min-w-0">
+                    {/* ================= PRODUCTS AREA ================= */}
+                    <div className="min-w-0">
 
-                {/* ================= CONTROLS ================= */}
-                <div
-                    className="
+                        {/* ================= CONTROLS ================= */}
+                        <div
+                            className="
                         sticky
                         top-20
                         z-40
@@ -930,11 +930,11 @@ async function updateBag(id: number, quantity: number) {
                         py-2
                         lg:top-22
                     "
-                >
+                        >
 
-                    {/* MOBILE CATEGORY PILLS */}
-                    <div
-                        className="
+                            {/* MOBILE CATEGORY PILLS */}
+                            <div
+                                className="
                             -mx-1
                             mb-3
                             overflow-x-auto
@@ -943,31 +943,31 @@ async function updateBag(id: number, quantity: number) {
                             scrollbar-none
                             lg:hidden
                         "
-                    >
-                        <div className="flex w-max gap-2">
-                            {categories.map((category) => (
-                                <CategoryButton
-                                    key={category.name}
-                                    category={category}
-                                    active={
-                                        activeCategory ===
-                                        category.name
-                                    }
-                                    onClick={() =>
-                                        setActiveCategory(
-                                            category.name
-                                        )
-                                    }
-                                    mobile
-                                />
-                            ))}
-                        </div>
-                    </div>
+                            >
+                                <div className="flex w-max gap-2">
+                                    {categories.map((category) => (
+                                        <CategoryButton
+                                            key={category.name}
+                                            category={category}
+                                            active={
+                                                activeCategory ===
+                                                category.name
+                                            }
+                                            onClick={() =>
+                                                setActiveCategory(
+                                                    category.name
+                                                )
+                                            }
+                                            mobile
+                                        />
+                                    ))}
+                                </div>
+                            </div>
 
 
-                    {/* SEARCH + SORT + FAVORITES */}
-                    <div
-                        className="
+                            {/* SEARCH + SORT + FAVORITES */}
+                            <div
+                                className="
                             flex
                             flex-col
                             gap-2.5
@@ -975,39 +975,39 @@ async function updateBag(id: number, quantity: number) {
                             sm:items-center
                             sm:gap-3
                         "
-                    >
+                            >
 
-                        {/* SEARCH */}
-                        <div
-                            className="
+                                {/* SEARCH */}
+                                <div
+                                    className="
                                 relative
                                 w-full
                                 sm:min-w-0
                                 sm:flex-1
                                 sm:max-w-[500px]
                             "
-                        >
-                            <Search
-                                size={17}
-                                strokeWidth={1.8}
-                                className="
+                                >
+                                    <Search
+                                        size={17}
+                                        strokeWidth={1.8}
+                                        className="
                                     pointer-events-none
                                     absolute left-3.5
                                     top-1/2
                                     -translate-y-1/2
                                     text-[#321714]/50
                                 "
-                            />
+                                    />
 
-                            <input
-                                type="search"
-                                aria-label="Search treats"
-                                value={search}
-                                onChange={(e) =>
-                                    setSearch(e.target.value)
-                                }
-                                placeholder="Search cookies, brownies, cakes…"
-                                className="
+                                    <input
+                                        type="search"
+                                        aria-label="Search treats"
+                                        value={search}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
+                                        placeholder="Search cookies, brownies, cakes…"
+                                        className="
                                     h-11
                                     w-full
                                     rounded-[14px]
@@ -1028,13 +1028,13 @@ async function updateBag(id: number, quantity: number) {
                                     sm:h-12
                                     sm:text-[13px]
                                 "
-                            />
+                                    />
 
-                            {search && (
-                                <button
-                                    onClick={() => setSearch("")}
-                                    aria-label="Clear search"
-                                    className="
+                                    {search && (
+                                        <button
+                                            onClick={() => setSearch("")}
+                                            aria-label="Clear search"
+                                            className="
                                         absolute
                                         right-2.5
                                         top-1/2
@@ -1050,42 +1050,42 @@ async function updateBag(id: number, quantity: number) {
                                         hover:bg-[#321714]/5
                                         hover:text-[#321714]
                                     "
-                                >
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
 
 
-                        {/* SORT */}
-                        <div
-                            className="
+                                {/* SORT */}
+                                <div
+                                    className="
                                 relative
                                 w-full
                                 sm:w-[190px]
                                 sm:shrink-0
                             "
-                        >
-                            <ArrowDownUp
-                                size={14}
-                                className="
+                                >
+                                    <ArrowDownUp
+                                        size={14}
+                                        className="
                                     pointer-events-none
                                     absolute left-3.5
                                     top-1/2
                                     -translate-y-1/2
                                     text-[#321714]/50
                                 "
-                            />
+                                    />
 
-                            <select
-                                aria-label="Sort treats"
-                                value={sort}
-                                onChange={(e) =>
-                                    setSort(
-                                        e.target.value as Sort
-                                    )
-                                }
-                                className="
+                                    <select
+                                        aria-label="Sort treats"
+                                        value={sort}
+                                        onChange={(e) =>
+                                            setSort(
+                                                e.target.value as Sort
+                                            )
+                                        }
+                                        className="
                                     h-11
                                     w-full
                                     cursor-pointer
@@ -1105,44 +1105,44 @@ async function updateBag(id: number, quantity: number) {
                                     sm:h-12
                                     sm:text-[12px]
                                 "
-                            >
-                                <option value="popular">
-                                    Most popular
-                                </option>
+                                    >
+                                        <option value="popular">
+                                            Most popular
+                                        </option>
 
-                                <option value="price-low">
-                                    Price: low to high
-                                </option>
+                                        <option value="price-low">
+                                            Price: low to high
+                                        </option>
 
-                                <option value="price-high">
-                                    Price: high to low
-                                </option>
+                                        <option value="price-high">
+                                            Price: high to low
+                                        </option>
 
-                                <option value="name">
-                                    Name: A to Z
-                                </option>
-                            </select>
+                                        <option value="name">
+                                            Name: A to Z
+                                        </option>
+                                    </select>
 
-                            <ChevronDown
-                                size={13}
-                                className="
+                                    <ChevronDown
+                                        size={13}
+                                        className="
                                     pointer-events-none
                                     absolute right-3.5
                                     top-1/2
                                     -translate-y-1/2
                                     text-[#321714]/50
                                 "
-                            />
-                        </div>
+                                    />
+                                </div>
 
 
-                        {/* FAVORITES */}
-                        <button
-                            onClick={() =>
-                                setOnlyFavorites((v) => !v)
-                            }
-                            aria-pressed={onlyFavorites}
-                            className={`
+                                {/* FAVORITES */}
+                                <button
+                                    onClick={() =>
+                                        setOnlyFavorites((v) => !v)
+                                    }
+                                    aria-pressed={onlyFavorites}
+                                    className={`
                                 flex
                                 h-11
                                 shrink-0
@@ -1156,28 +1156,27 @@ async function updateBag(id: number, quantity: number) {
                                 font-bold
                                 transition
                                 sm:px-4
-                                ${
-                                    onlyFavorites
-                                        ? "border-[#321714] bg-[#321714] text-white"
-                                        : "border-[#321714]/10 bg-[#FBF7F1] hover:bg-white"
-                                }
+                                ${onlyFavorites
+                                            ? "border-[#321714] bg-[#321714] text-white"
+                                            : "border-[#321714]/10 bg-[#FBF7F1] hover:bg-white"
+                                        }
                             `}
-                        >
-                            <Heart
-                                size={14}
-                                className={
-                                    onlyFavorites
-                                        ? "fill-[#FFD91A] text-[#FFD91A]"
-                                        : ""
-                                }
-                            />
+                                >
+                                    <Heart
+                                        size={14}
+                                        className={
+                                            onlyFavorites
+                                                ? "fill-[#FFD91A] text-[#FFD91A]"
+                                                : ""
+                                        }
+                                    />
 
-                            <span className="hidden sm:inline">
-                                Favourites
-                            </span>
+                                    <span className="hidden sm:inline">
+                                        Favourites
+                                    </span>
 
-                            <span
-                                className="
+                                    <span
+                                        className="
                                     flex h-5 min-w-5
                                     items-center
                                     justify-center
@@ -1188,19 +1187,19 @@ async function updateBag(id: number, quantity: number) {
                                     font-black
                                     text-[#321714]
                                 "
-                            >
-                                {favorites.length}
-                            </span>
-                        </button>
+                                    >
+                                        {favorites.length}
+                                    </span>
+                                </button>
 
-                    </div>
-                </div>
+                            </div>
+                        </div>
 
 
-                {/* ================= PRODUCT GRID ================= */}
-                <motion.div
-                    layout
-                    className="
+                        {/* ================= PRODUCT GRID ================= */}
+                        <motion.div
+                            layout
+                            className="
                         grid
                         grid-cols-2
                         gap-x-3
@@ -1210,55 +1209,55 @@ async function updateBag(id: number, quantity: number) {
                         lg:grid-cols-2
                         xl:grid-cols-3
                     "
-                >
-                    <AnimatePresence mode="popLayout">
-                        {filteredProducts.map(
-                            (product, index) => (
-                                <ProductCard
-                                    key={product._id}
-                                    product={product}
-                                    index={index}
-                                    cart={cart}
-                                    updateBag={updateBag}
-                                    isFavorite={favorites.includes(
-                                        product._id
-                                    )}
-                                    isAdded={
-                                        addedProduct ===
-                                        product._id
-                                    }
-                                    onFavorite={() =>
-                                        toggleFavorite(
-                                            product._id
-                                        )
-                                    }
-                                    onAdd={() =>
-                                        addToBag(
-                                            product._id
-                                        )
-                                    }
-                                    onQuickView={() =>
-                                        setQuickView(product)
-                                    }
-                                />
-                            )
-                        )}
-                    </AnimatePresence>
-                </motion.div>
+                        >
+                            <AnimatePresence mode="popLayout">
+                                {filteredProducts.map(
+                                    (product, index) => (
+                                        <ProductCard
+                                            key={product._id}
+                                            product={product}
+                                            index={index}
+                                            cart={cart}
+                                            updateBag={updateBag}
+                                            isFavorite={favorites.includes(
+                                                product._id
+                                            )}
+                                            isAdded={
+                                                addedProduct ===
+                                                product._id
+                                            }
+                                            onFavorite={() =>
+                                                toggleFavorite(
+                                                    product._id
+                                                )
+                                            }
+                                            onAdd={() =>
+                                                addToBag(
+                                                    product._id
+                                                )
+                                            }
+                                            onQuickView={() =>
+                                                setQuickView(product)
+                                            }
+                                        />
+                                    )
+                                )}
+                            </AnimatePresence>
+                        </motion.div>
 
 
-                {/* ================= EMPTY STATE ================= */}
-                {filteredProducts.length === 0 && (
-                    <motion.div
-                        initial={{
-                            opacity: 0,
-                            scale: 0.98,
-                        }}
-                        animate={{
-                            opacity: 1,
-                            scale: 1,
-                        }}
-                        className="
+                        {/* ================= EMPTY STATE ================= */}
+                        {filteredProducts.length === 0 && (
+                            <motion.div
+                                initial={{
+                                    opacity: 0,
+                                    scale: 0.98,
+                                }}
+                                animate={{
+                                    opacity: 1,
+                                    scale: 1,
+                                }}
+                                className="
                             flex
                             min-h-[320px]
                             flex-col
@@ -1275,43 +1274,43 @@ async function updateBag(id: number, quantity: number) {
                             sm:rounded-[28px]
                             sm:px-6
                         "
-                    >
-                        <motion.div
-                            animate={
-                                reduce
-                                    ? undefined
-                                    : {
-                                          rotate: [
-                                              -8,
-                                              8,
-                                              -8,
-                                          ],
-                                      }
-                            }
-                            transition={{
-                                duration: 2.4,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                            }}
-                            className="
+                            >
+                                <motion.div
+                                    animate={
+                                        reduce
+                                            ? undefined
+                                            : {
+                                                rotate: [
+                                                    -8,
+                                                    8,
+                                                    -8,
+                                                ],
+                                            }
+                                    }
+                                    transition={{
+                                        duration: 2.4,
+                                        repeat: Infinity,
+                                        ease: "easeInOut",
+                                    }}
+                                    className="
                                 mb-4
                                 text-5xl
                                 sm:mb-5
                                 sm:text-6xl
                             "
-                        >
-                            🍪
-                        </motion.div>
+                                >
+                                    🍪
+                                </motion.div>
 
-                        <h3 className="font-title text-2xl sm:text-3xl">
-                            {onlyFavorites &&
-                            favorites.length === 0
-                                ? "No favourites yet."
-                                : "No treats match that."}
-                        </h3>
+                                <h3 className="font-title text-2xl sm:text-3xl">
+                                    {onlyFavorites &&
+                                        favorites.length === 0
+                                        ? "No favourites yet."
+                                        : "No treats match that."}
+                                </h3>
 
-                        <p
-                            className="
+                                <p
+                                    className="
                                 mt-2
                                 max-w-[280px]
                                 text-[12px]
@@ -1323,16 +1322,16 @@ async function updateBag(id: number, quantity: number) {
                                 sm:text-[13px]
                                 sm:leading-6
                             "
-                        >
-                            {onlyFavorites &&
-                            favorites.length === 0
-                                ? "Tap the heart on any treat to save it here."
-                                : "Try a different word, or clear your filters to see everything."}
-                        </p>
+                                >
+                                    {onlyFavorites &&
+                                        favorites.length === 0
+                                        ? "Tap the heart on any treat to save it here."
+                                        : "Try a different word, or clear your filters to see everything."}
+                                </p>
 
-                        <button
-                            onClick={resetFilters}
-                            className="
+                                <button
+                                    onClick={resetFilters}
+                                    className="
                                 mt-5
                                 rounded-[12px]
                                 bg-[#FFD91A]
@@ -1354,24 +1353,24 @@ async function updateBag(id: number, quantity: number) {
                                 sm:py-3
                                 sm:text-xl
                             "
-                        >
-                            Show everything
-                        </button>
-                    </motion.div>
-                )}
+                                >
+                                    Show everything
+                                </button>
+                            </motion.div>
+                        )}
 
-            </div>
-        </div>
-    </section>
-
-
-    <div className="h-16 sm:h-24" />
+                    </div>
+                </div>
+            </section>
 
 
-    {/* ================= TOAST ================= */}
-    <div
-        aria-live="polite"
-        className="
+            <div className="h-16 sm:h-24" />
+
+
+            {/* ================= TOAST ================= */}
+            <div
+                aria-live="polite"
+                className="
             pointer-events-none
             fixed
             inset-x-0
@@ -1383,31 +1382,31 @@ async function updateBag(id: number, quantity: number) {
             sm:bottom-7
             sm:px-4
         "
-    >
-        <AnimatePresence>
-            {toast && (
-                <motion.div
-                    initial={{
-                        opacity: 0,
-                        y: 24,
-                        scale: 0.9,
-                    }}
-                    animate={{
-                        opacity: 1,
-                        y: 0,
-                        scale: 1,
-                    }}
-                    exit={{
-                        opacity: 0,
-                        y: 12,
-                        scale: 0.95,
-                    }}
-                    transition={{
-                        type: "spring",
-                        stiffness: 380,
-                        damping: 28,
-                    }}
-                    className="
+            >
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div
+                            initial={{
+                                opacity: 0,
+                                y: 24,
+                                scale: 0.9,
+                            }}
+                            animate={{
+                                opacity: 1,
+                                y: 0,
+                                scale: 1,
+                            }}
+                            exit={{
+                                opacity: 0,
+                                y: 12,
+                                scale: 0.95,
+                            }}
+                            transition={{
+                                type: "spring",
+                                stiffness: 380,
+                                damping: 28,
+                            }}
+                            className="
                         flex
                         max-w-[calc(100vw-24px)]
                         items-center
@@ -1427,9 +1426,9 @@ async function updateBag(id: number, quantity: number) {
                         sm:pr-5
                         sm:text-[12px]
                     "
-                >
-                    <span
-                        className="
+                        >
+                            <span
+                                className="
                             flex
                             h-6
                             w-6
@@ -1440,50 +1439,50 @@ async function updateBag(id: number, quantity: number) {
                             bg-[#FFD91A]
                             text-[#321714]
                         "
-                    >
-                        <Check
-                            size={14}
-                            strokeWidth={3}
-                        />
-                    </span>
+                            >
+                                <Check
+                                    size={14}
+                                    strokeWidth={3}
+                                />
+                            </span>
 
-                    <span className="truncate">
-                        {toast}
-                    </span>
-                </motion.div>
-            )}
-        </AnimatePresence>
-    </div>
+                            <span className="truncate">
+                                {toast}
+                            </span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
 
 
-    {/* ================= FLOATING BAG ================= */}
-    <AnimatePresence>
-        {(cart || []).length > 0 && (
-            <motion.button
-                onClick={() => toggleShowCart()}
-                aria-label={`Open bag, ${cart.length} items`}
-                initial={{
-                    opacity: 0,
-                    scale: 0.8,
-                    y: 20,
-                }}
-                animate={{
-                    opacity: 1,
-                    scale: 1,
-                    y: 0,
-                }}
-                exit={{
-                    opacity: 0,
-                    scale: 0.8,
-                    y: 20,
-                }}
-                whileHover={{
-                    y: -3,
-                }}
-                whileTap={{
-                    scale: 0.96,
-                }}
-                className="
+            {/* ================= FLOATING BAG ================= */}
+            <AnimatePresence>
+                {(cart || []).length > 0 && (
+                    <motion.button
+                        onClick={() => toggleShowCart()}
+                        aria-label={`Open bag, ${cart.length} items`}
+                        initial={{
+                            opacity: 0,
+                            scale: 0.8,
+                            y: 20,
+                        }}
+                        animate={{
+                            opacity: 1,
+                            scale: 1,
+                            y: 0,
+                        }}
+                        exit={{
+                            opacity: 0,
+                            scale: 0.8,
+                            y: 20,
+                        }}
+                        whileHover={{
+                            y: -3,
+                        }}
+                        whileTap={{
+                            scale: 0.96,
+                        }}
+                        className="
                     fixed
                     bottom-4
                     right-4
@@ -1508,27 +1507,27 @@ async function updateBag(id: number, quantity: number) {
                     sm:px-5
                     sm:py-3.5
                 "
-            >
-                <ShoppingBag size={16} />
+                    >
+                        <ShoppingBag size={16} />
 
-                <span className="text-[11px] font-black sm:text-[12px]">
-                    Bag
-                </span>
+                        <span className="text-[11px] font-black sm:text-[12px]">
+                            Bag
+                        </span>
 
-                <motion.span
-                    key={cart.length}
-                    initial={{
-                        scale: 1.7,
-                    }}
-                    animate={{
-                        scale: 1,
-                    }}
-                    transition={{
-                        type: "spring",
-                        stiffness: 500,
-                        damping: 15,
-                    }}
-                    className="
+                        <motion.span
+                            key={cart.length}
+                            initial={{
+                                scale: 1.7,
+                            }}
+                            animate={{
+                                scale: 1,
+                            }}
+                            transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 15,
+                            }}
+                            className="
                         flex
                         h-6
                         min-w-6
@@ -1542,29 +1541,29 @@ async function updateBag(id: number, quantity: number) {
                         text-[#321714]
                         sm:text-[11px]
                     "
-                >
-                    {cart.length}
-                </motion.span>
-            </motion.button>
-        )}
-    </AnimatePresence>
+                        >
+                            {cart.length}
+                        </motion.span>
+                    </motion.button>
+                )}
+            </AnimatePresence>
 
 
-    {/* ================= QUICK VIEW ================= */}
-    <AnimatePresence>
-        {quickView && (
-            <QuickView
-                product={quickView}
-                onClose={() => setQuickView(null)}
-                onAdd={() => {
-                    addToBag(quickView._id);
-                    setQuickView(null);
-                }}
-            />
-        )}
-    </AnimatePresence>
+            {/* ================= QUICK VIEW ================= */}
+            <AnimatePresence>
+                {quickView && (
+                    <QuickView
+                        product={quickView}
+                        onClose={() => setQuickView(null)}
+                        onAdd={() => {
+                            addToBag(quickView._id);
+                            setQuickView(null);
+                        }}
+                    />
+                )}
+            </AnimatePresence>
 
-</main>
+        </main>
     );
 }
 
@@ -1633,7 +1632,7 @@ function ProductCard({
     onQuickView: () => void;
     updateBag: (id: number, quantity: number) => void;
 }) {
-    const cartItem = (cart||[]).find(
+    const cartItem = (cart || []).find(
         (item) => item.productId == product._id
     );
 
@@ -1721,10 +1720,9 @@ function ProductCard({
                         rounded-full backdrop-blur-md
                         transition-all duration-300
                         sm:right-3 sm:top-3 sm:h-9 sm:w-9
-                        ${
-                            isFavorite
-                                ? "bg-[#321714] text-white"
-                                : "bg-[#FCF9F3]/85 text-[#321714] hover:bg-[#FCF9F3]"
+                        ${isFavorite
+                            ? "bg-[#321714] text-white"
+                            : "bg-[#FCF9F3]/85 text-[#321714] hover:bg-[#FCF9F3]"
                         }
                     `}
                 >
@@ -1922,10 +1920,9 @@ function ProductCard({
                                 sm:px-4
                                 sm:text-sm
                                 sm:tracking-[0.08em]
-                                ${
-                                    isAdded
-                                        ? "bg-[#3D8B5B] text-white"
-                                        : "bg-[#FFD91A] text-[#321714] hover:-translate-y-0.5 hover:shadow-[3px_4px_0_#321714]"
+                                ${isAdded
+                                    ? "bg-[#3D8B5B] text-white"
+                                    : "bg-[#FFD91A] text-[#321714] hover:-translate-y-0.5 hover:shadow-[3px_4px_0_#321714]"
                                 }
                             `}
                         >
